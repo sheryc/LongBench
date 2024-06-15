@@ -1,12 +1,14 @@
-import os
-import json
 import argparse
+import json
+import os
+
 args = argparse.ArgumentParser()
 args.add_argument("--data", type=str, default="C200_7")
 args.add_argument("--model", type=str, default="chatglm2-6b")
 args = args.parse_args()
 
 import sys
+
 sys.path.append("..")
 from metrics import (
     qa_f1_score,
@@ -43,6 +45,7 @@ dataset2metric = {
     "repobench-p": code_sim_score,
 }
 
+
 def scorer(dataset, predictions, answers, all_classes):
     total_score = 0.
     for (prediction, ground_truths) in zip(predictions, answers):
@@ -51,6 +54,7 @@ def scorer(dataset, predictions, answers, all_classes):
             score = max(score, dataset2metric[dataset](prediction, ground_truth, all_classes=all_classes))
         total_score += score
     return round(100 * total_score / len(predictions), 2)
+
 
 if __name__ == '__main__':
     scores = dict()

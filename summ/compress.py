@@ -1,43 +1,43 @@
-import requests
-import json
-import jsonlines
-from transformers import AutoTokenizer, AutoModel
-import matplotlib.pyplot as plt
-from tqdm import tqdm
-import concurrent.futures
-from concurrent.futures import ThreadPoolExecutor
-import multiprocessing
 import argparse
-from transformers import LlamaForCausalLM, LlamaTokenizer
-import torch
+import concurrent.futures
 import os
-from threading import Lock
-import time
 import re
+import time
+from threading import Lock
+
+import jsonlines
+import requests
+import torch
+from tqdm import tqdm
+from transformers import AutoTokenizer, AutoModel
+from transformers import LlamaForCausalLM, LlamaTokenizer
+
 from llama_flash_attn_monkey_patch import replace_llama_attn_with_flash_attn
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--max_len', type=int, default=500)
-parser.add_argument('--model', type=str, default="Llama2") # glm2, gpt-16k, Llama2
+parser.add_argument('--model', type=str, default="Llama2")  # glm2, gpt-16k, Llama2
 args = parser.parse_args()
 print(args)
-GPT_key = "" #openai key
+GPT_key = ""  # openai key
 GPT_MODEL = 'gpt-3.5-turbo-16k'
 GLM_MODEL = "THUDM/chatglm2-6b-32k"
 LLAMA_MODEL = "meta-llama/Llama-2-7b-chat-hf"
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-jsonl_files = ['qmsum.jsonl', 'gov_report.jsonl',  'vcsum.jsonl','multinews.jsonl']
-raw_data_folder = '../LongBench/data' #raw data folder
-new_data_folder = args.model+'_'+str(args.max_len)+'/data' #compressed data folder
-compressed_context_path ='../LongBench/compressed_data_'+str(args.max_len)+'/data' #compressed context folder 
+jsonl_files = ['qmsum.jsonl', 'gov_report.jsonl', 'vcsum.jsonl', 'multinews.jsonl']
+raw_data_folder = '../LongBench/data'  # raw data folder
+new_data_folder = args.model + '_' + str(args.max_len) + '/data'  # compressed data folder
+compressed_context_path = '../LongBench/compressed_data_' + str(args.max_len) + '/data'  # compressed context folder
 if not os.path.exists(new_data_folder):
     os.makedirs(new_data_folder)
 if not os.path.exists(compressed_context_path):
     os.makedirs(compressed_context_path)
 
+
 def build_chat(tokenizer, prompt, model_name):
     if "glm2" in model_name:
-        prompt = tokenizer.build_prompt(prompt)     
+        prompt = tokenizer.build_prompt(prompt)
     elif "Llama2" in model_name:
         prompt = f"[INST]{prompt}[/INST]"
     elif "xgen" in model_name:
@@ -50,18 +50,22 @@ def build_chat(tokenizer, prompt, model_name):
         prompt = f"<|User|>:{prompt}<eoh>\n<|Bot|>:"
     return prompt
 
-if args.model=="glm2":
+
+if args.model == "glm2":
     model_path = GLM_MODEL
-    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True,max_length=1024)
+    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True, max_length=1024)
     # model = load_model_on_gpus(model_path, num_gpus=4)
     model = AutoModel.from_pretrained(model_path, trust_remote_code=True, torch_dtype=torch.bfloat16).to(device)
     model = model.eval()
+
+
     def generate_response(prompt):
         tokenized_prompt = tokenizer(prompt, truncation=False, return_tensors="pt").input_ids[0]
         max_length = 31500
         if len(tokenized_prompt) > max_length:
-            half = int(max_length/2)
-            prompt = tokenizer.decode(tokenized_prompt[:half], skip_special_tokens=True)+tokenizer.decode(tokenized_prompt[-half:], skip_special_tokens=True)
+            half = int(max_length / 2)
+            prompt = tokenizer.decode(tokenized_prompt[:half], skip_special_tokens=True) + tokenizer.decode(
+                tokenized_prompt[-half:], skip_special_tokens=True)
         prompt = build_chat(tokenizer, prompt, 'glm2')
         input = tokenizer(prompt, truncation=False, return_tensors="pt").to(device)
         context_length = input.input_ids.shape[-1]
@@ -74,9 +78,9 @@ if args.model=="glm2":
         )[0]
         pred = tokenizer.decode(output[context_length:], skip_special_tokens=True)
         return pred
-        
-elif args.model=="gpt-16k":
-    #using GPT API and tokenizer
+
+elif args.model == "gpt-16k":
+    # using GPT API and tokenizer
     def query(messages, force_commit=False):
         tries = 0
         while tries < 5:
@@ -85,7 +89,7 @@ elif args.model=="gpt-16k":
                 headers = {
                     'Authorization': GPT_key
                 }
-                resp = requests.post("https://api.openai.com/v1/chat/completions", json = {
+                resp = requests.post("https://api.openai.com/v1/chat/completions", json={
                     "model": GPT_MODEL,
                     "messages": messages,
                     "temperature": 1.0
@@ -99,28 +103,32 @@ elif args.model=="gpt-16k":
             except Exception as e:
                 if "maximum context length" in str(e):
                     raise e
-                print("Error Occurs: \"%s\"        Retry ..."%(str(e)))
+                print("Error Occurs: \"%s\"        Retry ..." % (str(e)))
         else:
             print("Max tries. Failed.")
             return
         return resp["choices"][0]["message"]["content"]
-    
+
+
     def generate_response(prompt):
         msg = [{"role": "user", "content": prompt}]
         result = query(msg)
         return result
-    
-elif args.model=="Llama2":
+
+elif args.model == "Llama2":
     replace_llama_attn_with_flash_attn()
     tokenizer = LlamaTokenizer.from_pretrained(LLAMA_MODEL)
-    model =LlamaForCausalLM.from_pretrained(LLAMA_MODEL, torch_dtype=torch.bfloat16).to(device)
+    model = LlamaForCausalLM.from_pretrained(LLAMA_MODEL, torch_dtype=torch.bfloat16).to(device)
     model.eval()
+
+
     def generate_response(prompt):
         tokenized_prompt = tokenizer(prompt, truncation=False, return_tensors="pt").input_ids[0]
         max_length = 3500
         if len(tokenized_prompt) > max_length:
-            half = int(max_length/2)
-            prompt = tokenizer.decode(tokenized_prompt[:half], skip_special_tokens=True)+tokenizer.decode(tokenized_prompt[-half:], skip_special_tokens=True)
+            half = int(max_length / 2)
+            prompt = tokenizer.decode(tokenized_prompt[:half], skip_special_tokens=True) + tokenizer.decode(
+                tokenized_prompt[-half:], skip_special_tokens=True)
             prompt = build_chat(tokenizer, prompt, 'Llama2')
         input = tokenizer(prompt, truncation=False, return_tensors="pt").to(device)
         context_length = input.input_ids.shape[-1]
@@ -131,13 +139,13 @@ elif args.model=="Llama2":
             do_sample=False,
             temperature=1.0,
         )[0]
-        pred = tokenizer.decode(output[context_length:], skip_special_tokens=True)  
+        pred = tokenizer.decode(output[context_length:], skip_special_tokens=True)
         return pred
-    
-def get_word_list(s1):
 
-    regEx = re.compile('[\W]')   
-    res = re.compile(r"([\u4e00-\u9fa5])")    #  [\u4e00-\u9fa5] for zh
+
+def get_word_list(s1):
+    regEx = re.compile('[\W]')
+    res = re.compile(r"([\u4e00-\u9fa5])")  # [\u4e00-\u9fa5] for zh
 
     p1 = regEx.split(s1.lower())
     str1_list = []
@@ -149,43 +157,45 @@ def get_word_list(s1):
             for ch in ret:
                 str1_list.append(ch)
 
-    list_word1 = [w for w in str1_list if len(w.strip()) > 0]  
-    return  list_word1
+    list_word1 = [w for w in str1_list if len(w.strip()) > 0]
+    return list_word1
+
 
 def get_word_len(s1):
-    return len(get_word_list(s1))    
+    return len(get_word_list(s1))
 
-def data_spilt(data_test,max_len=args.max_len):
 
-    data_len=len(data_test)
-    #split data_test to n parts averagely according to data_len
+def data_spilt(data_test, max_len=args.max_len):
+    data_len = len(data_test)
+    # split data_test to n parts averagely according to data_len
     data_words_len = get_word_len(data_test)
-    split_len = int(data_words_len/max_len)
+    split_len = int(data_words_len / max_len)
 
-    text_len = int(data_len/split_len)
-    #start position of each part
+    text_len = int(data_len / split_len)
+    # start position of each part
     text = data_test
-    text_list=[]
+    text_list = []
     text_num = 0
     while text_num <= split_len:
         text_num += 1
         try:
-            for i in range(text_len,text_len+1500):
-        
-                    if text[i] in ['\n', '.', '。', '?', '？', '!', '！']:
-                        # cut off the text until the end of the line, using the length of the text to decide when to stop   
-                        text_list.append(text[:i+1])
-                        text = text[i+1:]
-                        break
+            for i in range(text_len, text_len + 1500):
+
+                if text[i] in ['\n', '.', '。', '?', '？', '!', '！']:
+                    # cut off the text until the end of the line, using the length of the text to decide when to stop
+                    text_list.append(text[:i + 1])
+                    text = text[i + 1:]
+                    break
         except:
             if text not in text_list:
                 text_list.append(text)
-    if text!='' and text not in text_list:
+    if text != '' and text not in text_list:
         text_list.append(text)
 
     return text_list
 
-def compress(data_test, max_len=args.max_len, language='en',_id=None,dataset_type=None):
+
+def compress(data_test, max_len=args.max_len, language='en', _id=None, dataset_type=None):
     try:
         text_list = data_spilt(data_test)
         responses = []
@@ -222,52 +232,57 @@ def compress(data_test, max_len=args.max_len, language='en',_id=None,dataset_typ
 
             compressed_data_list.append(compressed_entry)
             compressed_id += 1
-        
+
         # Save the compressed data to a file
-        path = os.path.join(compressed_context_path, str(args.model)+'_'+str(max_len)+'_'+str(dataset_type)+'.jsonl')
+        path = os.path.join(compressed_context_path,
+                            str(args.model) + '_' + str(max_len) + '_' + str(dataset_type) + '.jsonl')
         with jsonlines.open(path, 'a') as writer:
             writer.write_all(compressed_data_list)
-        #save repsonses to file
+        # save repsonses to file
         if language == 'en':
             for i in range(len(responses)):
-                responses[i] = 'Paragraph Summary'+str(i+1)+" : "+responses[i]+'\n'
+                responses[i] = 'Paragraph Summary' + str(i + 1) + " : " + responses[i] + '\n'
         elif language == 'zh':
             for i in range(len(responses)):
-                responses[i] = '段落摘要'+str(i+1)+" : "+responses[i]+'\n'
-            
-        new_text_words_len =get_word_len(new_text)
-        print('new_text_words_len :',new_text_words_len)
+                responses[i] = '段落摘要' + str(i + 1) + " : " + responses[i] + '\n'
+
+        new_text_words_len = get_word_len(new_text)
+        print('new_text_words_len :', new_text_words_len)
     except Exception as e:
         print(str(e), sep=" | ")
         new_text = data_test
-    return new_text      
+    return new_text
+
 
 def handle_item(item, max_len):
     try:
-        context = item['context']  
+        context = item['context']
         language = item['language']
         _id = item['_id']
         dataset_type = item['dataset']
-        compressd_context = compress(context, max_len,language,_id,dataset_type)
+        compressd_context = compress(context, max_len, language, _id, dataset_type)
         item['context'] = compressd_context
         if 'all_classes' not in item.keys():
             item['all_classes'] = 'None'
-        #count the length of compressd context basen on language
+        # count the length of compressd context basen on language
         item['length'] = get_word_len(compressd_context)
 
     except Exception as e:
-        print('Compress Fail：',str(e), sep=" | ")
+        print('Compress Fail：', str(e), sep=" | ")
     return item
+
 
 def save_data(data, file_name):
     with jsonlines.open(file_name, 'a') as writer:
         writer.write_all(data)
     return data
 
+
 def load_data(file_name):
     with jsonlines.open(file_name) as reader:
         data = list(reader)
     return data
+
 
 def parallel_process_data(data, start_index, handle_item, workers=20, callback=None, checkpoint_interval=20):
     save_lock = Lock()
@@ -276,7 +291,7 @@ def parallel_process_data(data, start_index, handle_item, workers=20, callback=N
         id_set = set()
         for i in range(start_index):
             id_set.add(data[i]['_id'])
-        
+
         for i in range(start_index, len(data)):
             item = data[i]
             future = executor.submit(handle_item, item, args.max_len)
@@ -284,7 +299,7 @@ def parallel_process_data(data, start_index, handle_item, workers=20, callback=N
             if i > 0 and i % checkpoint_interval == 0:
 
                 processed_data = []
-                
+
                 with tqdm(total=len(futures)) as pbar:
                     for future in concurrent.futures.as_completed(futures):
 
@@ -318,9 +333,10 @@ def parallel_process_data(data, start_index, handle_item, workers=20, callback=N
                 save_data(processed_data, checkpoint_file)
             except Exception as e:
                 time.sleep(1)
-                print('Save data：',str(e), sep=" | ")
+                print('Save data：', str(e), sep=" | ")
                 save_data(processed_data, new_file_path)
                 save_data(processed_data, checkpoint_file)
+
 
 for jsonl_file in jsonl_files:
     raw_file_path = os.path.join(raw_data_folder, jsonl_file)

@@ -4,23 +4,17 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-import os
-
 import argparse
-import csv
-import logging
+import os
 import pickle
 
-import numpy as np
-import torch
-
-import transformers
-
-import src.slurm
 import src.contriever
-import src.utils
 import src.data
 import src.normalize_text
+import src.slurm
+import src.utils
+import torch
+
 
 def embed_passages(args, passages, model, tokenizer):
     total = 0
@@ -92,6 +86,7 @@ def main(args):
             base_name = os.path.basename(file_path)  # 获取文件名
             file_name_without_extension = os.path.splitext(base_name)[0]  # 去除后缀
             return file_name_without_extension
+
         fileName = get_file_name_without_extension(psg)
         save_file = os.path.join(args.output_dir, fileName)
         os.makedirs(args.output_dir, exist_ok=True)
@@ -100,6 +95,7 @@ def main(args):
             pickle.dump((allids, allembeddings), f)
 
         print(f"Total passages processed {len(allids)}. Written to {save_file}.")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

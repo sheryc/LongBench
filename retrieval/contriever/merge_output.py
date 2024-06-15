@@ -1,21 +1,23 @@
-import os
-import json
 import argparse
-from tqdm import tqdm
+import json
+import os
 import sys
+
+from tqdm import tqdm
+
 sys.path.append('..')
 from splitter import get_word_len
 
 # os.chdir(os.path.dirname(os.path.abspath(__file__)))
 parser = argparse.ArgumentParser()
 parser.add_argument('--input_folder', type=str, default='mcontriever_output',
-                        help='Path to the input folder containing jsonl files.')
+                    help='Path to the input folder containing jsonl files.')
 parser.add_argument('--output_file', type=str, default='CONTENT.jsonl',
-                        help='Output jsonl file name.')
+                    help='Output jsonl file name.')
 parser.add_argument('--input_dataFile', type=str, default='inputData.jsonl',
-                        help='Input datum jsonl file name.')
+                    help='Input datum jsonl file name.')
 parser.add_argument('--output_dataFile', type=str, default='DATA.jsonl',
-                        help='Output datum jsonl file name.')
+                    help='Output datum jsonl file name.')
 args = parser.parse_args()
 
 
@@ -36,6 +38,7 @@ def merge_text(jsonl_file, maxLen=1500):
     }
 
     return output_data
+
 
 def process_all_jsonl_files(args):
     input_folder = args.input_folder
@@ -64,5 +67,6 @@ def process_all_jsonl_files(args):
                         data_l['retrieved'] = modified_data['retrieved']
                         break
                 out_data.write(json.dumps(data_l, ensure_ascii=False) + '\n')
+
 
 process_all_jsonl_files(args)

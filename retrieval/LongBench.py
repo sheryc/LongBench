@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import os
 
 import datasets
-import json
 
 _DESCRIPTION = """\
 LongBench is a comprehensive benchmark for multilingual and multi-task purposes, with the goal to fully measure and evaluate the ability of pre-trained language models to understand long text. This dataset consists of twenty different tasks, covering key long-text application scenarios such as multi-document QA, single-document QA, summarization, few-shot learning, synthetic tasks, and code completion.
@@ -22,17 +22,16 @@ LongBench is a comprehensive benchmark for multilingual and multi-task purposes,
 
 _HOMEPAGE = "https://github.com/THUDM/LongBench"
 
-
 # _URL = r"https://huggingface.co/datasets/THUDM/LongBench/resolve/main/data.zip"
 _URLS = {
-    "2wikimqa": "./data/2wikimqa.jsonl", 
-    "dureader": "./data/dureader.jsonl", 
-    "qasper": "./data/qasper.jsonl", 
-    "hotpotqa": "./data/hotpotqa.jsonl", 
-    "narrativeqa": "./data/narrativeqa.jsonl", 
-    "musique": "./data/musique.jsonl", 
-    "multifieldqa_zh":"./data/multifieldqa_zh.jsonl",
-    "multifieldqa_en":"./data/multifieldqa_en.jsonl",
+    "2wikimqa": "./data/2wikimqa.jsonl",
+    "dureader": "./data/dureader.jsonl",
+    "qasper": "./data/qasper.jsonl",
+    "hotpotqa": "./data/hotpotqa.jsonl",
+    "narrativeqa": "./data/narrativeqa.jsonl",
+    "musique": "./data/musique.jsonl",
+    "multifieldqa_zh": "./data/multifieldqa_zh.jsonl",
+    "multifieldqa_en": "./data/multifieldqa_en.jsonl",
 }
 
 task_list = [
@@ -63,15 +62,15 @@ class LongBench(datasets.GeneratorBasedBuilder):
     def _info(self):
         features = datasets.Features(
             {
-                "input": datasets.Value("string"), 
-                "context": datasets.Value("string"), 
-                "answers": [datasets.Value("string")], 
-                "length": datasets.Value("int32"), 
-                "dataset": datasets.Value("string"), 
-                "language": datasets.Value("string"), 
+                "input": datasets.Value("string"),
+                "context": datasets.Value("string"),
+                "answers": [datasets.Value("string")],
+                "length": datasets.Value("int32"),
+                "dataset": datasets.Value("string"),
+                "language": datasets.Value("string"),
                 "all_classes": [datasets.Value("string")],
                 "retrieved": [datasets.Value("string")],
-                "_id": datasets.Value("string"), 
+                "_id": datasets.Value("string"),
             }
         )
         return datasets.DatasetInfo(

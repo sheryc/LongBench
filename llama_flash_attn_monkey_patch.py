@@ -1,16 +1,13 @@
-from typing import List, Optional, Tuple
+import math
+from typing import Optional, Tuple
 
 import torch
-from torch import nn
-import math
-
 import transformers
-from transformers.models.llama.modeling_llama import apply_rotary_pos_emb
-
 from einops import rearrange
-
-from flash_attn.flash_attn_interface import flash_attn_varlen_qkvpacked_func
 from flash_attn.bert_padding import unpad_input, pad_input
+from flash_attn.flash_attn_interface import flash_attn_varlen_qkvpacked_func
+from torch import nn
+from transformers.models.llama.modeling_llama import apply_rotary_pos_emb
 
 
 def forward(
@@ -22,7 +19,7 @@ def forward(
         output_attentions: bool = False,
         use_cache: bool = False,
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor],
-           Optional[Tuple[torch.Tensor]]]:
+Optional[Tuple[torch.Tensor]]]:
     """Input shape: Batch x Time x Channel
 
     attention_mask: [bsz, q_len]

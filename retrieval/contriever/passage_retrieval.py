@@ -4,29 +4,26 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-import os
 import argparse
-import csv
+import glob
 import json
-import logging
+import os
 import pickle
 import time
-import glob
-from pathlib import Path
 
 import numpy as np
-import torch
-import transformers
-
-import src.index
 import src.contriever
-import src.utils
-import src.slurm
 import src.data
-from src.evaluation import calculate_matches
+import src.index
 import src.normalize_text
+import src.slurm
+import src.utils
+import torch
+from src.evaluation import calculate_matches
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
+
+
 # os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 def embed_queries(args, queries, model, tokenizer):
@@ -42,7 +39,6 @@ def embed_queries(args, queries, model, tokenizer):
             batch_question.append(q)
 
             if len(batch_question) == args.per_gpu_batch_size or k == len(queries) - 1:
-
                 encoded_batch = tokenizer.batch_encode_plus(
                     batch_question,
                     return_tensors="pt",
@@ -100,7 +96,7 @@ def validate(data, workers_num):
     message = ""
     for k in [5, 10, 20, 100]:
         if k <= len(top_k_hits):
-            message += f"R@{k}: {top_k_hits[k-1]} "
+            message += f"R@{k}: {top_k_hits[k - 1]} "
     print(message)
     return match_stats.questions_doc_hits
 
@@ -131,6 +127,7 @@ def add_hasanswer(data, hasanswer):
         for k, d in enumerate(ex["ctxs"]):
             d["hasanswer"] = hasanswer[i][k]
 
+
 def load_data(data_path):
     if data_path.endswith(".json"):
         with open(data_path, "r") as fin:
@@ -145,7 +142,6 @@ def load_data(data_path):
 
 
 def main(args):
-
     print(f"Loading model from: {args.model_name_or_path}")
     model, tokenizer, _ = src.contriever.load_retriever(args.model_name_or_path)
     model.eval()
@@ -166,7 +162,7 @@ def main(args):
         # print(f"Indexing passages from files {input_paths}")
         start_time_indexing = time.time()
         index_encoded_data(index, input_paths, args.indexing_batch_size)
-        print(f"Indexing time: {time.time()-start_time_indexing:.1f} s.")
+        print(f"Indexing time: {time.time() - start_time_indexing:.1f} s.")
         if args.save_or_load_index:
             index.serialize(embeddings_dir)
 
@@ -187,7 +183,7 @@ def main(args):
         start_time_retrieval = time.time()
         # top_ids_and_scores = index.search_knn(questions_embedding, args.n_docs)
         top_ids_and_scores = index.search_knn(questions_embedding, len(passages))
-        print(f"{len(passages)} psgs: Search time: {time.time()-start_time_retrieval:.1f} s.")
+        print(f"{len(passages)} psgs: Search time: {time.time() - start_time_retrieval:.1f} s.")
 
         add_passages(data, passage_id_map, top_ids_and_scores)
         # hasanswer = validate(data, args.validation_workers)
@@ -207,13 +203,15 @@ if __name__ == "__main__":
         "--data",
         # required=True,
         type=str,
-        
+
         default='./data_longbench/split/2wikimqa/0a64d8873482d91efc595a508218c6ce881c13c95028039e.jsonl',
         help=".json file containing question and answers, similar format to reader data",
     )
-    parser.add_argument("--passages", type=str, default='./data_longbench/split/2wikimqa/0a64d8873482d91efc595a508218c6ce881c13c95028039e.tsv',
-                         help="Path to passages (.tsv file)")
-    parser.add_argument("--passages_embeddings", type=str, default='./data_longbench/mEmbeddings/2wikimqa/0a64d8873482d91efc595a508218c6ce881c13c95028039e.jsonl', 
+    parser.add_argument("--passages", type=str,
+                        default='./data_longbench/split/2wikimqa/0a64d8873482d91efc595a508218c6ce881c13c95028039e.tsv',
+                        help="Path to passages (.tsv file)")
+    parser.add_argument("--passages_embeddings", type=str,
+                        default='./data_longbench/mEmbeddings/2wikimqa/0a64d8873482d91efc595a508218c6ce881c13c95028039e.jsonl',
                         help="Glob path to encoded passages")
     parser.add_argument(
         "--output_dir", type=str, default=None, help="Results are written to outputdir with data suffix"
@@ -228,7 +226,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--model_name_or_path", type=str, default='./../mcontriever',
-          help="path to directory containing model weights and config file"
+        help="path to directory containing model weights and config file"
     )
     parser.add_argument("--no_fp16", action="store_true", help="inference in fp32")
     parser.add_argument("--question_maxlength", type=int, default=512, help="Maximum number of tokens in a question")

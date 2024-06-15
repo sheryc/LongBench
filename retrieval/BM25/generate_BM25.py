@@ -1,17 +1,20 @@
-from rank_bm25 import BM25Okapi
-
-import os
-import json
-from concurrent.futures import ThreadPoolExecutor, wait
-from tqdm import tqdm
 import argparse
+import json
+import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, wait
+
+from rank_bm25 import BM25Okapi
+from tqdm import tqdm
+
 sys.path.append('..')
 from splitter import split_long_sentence, get_word_len, regex
+
+
 # DEBUG
 # os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-def retriveDoc(query: str, document: str, chunk_size, file_name:str,
+def retriveDoc(query: str, document: str, chunk_size, file_name: str,
                js, output_list, idx, pbar=None, maxLen=1500):
     # 1. Splits the context into pieces
     texts = split_long_sentence(document, regex, chunk_size=chunk_size, filename=file_name)
@@ -19,7 +22,7 @@ def retriveDoc(query: str, document: str, chunk_size, file_name:str,
     retriever = BM25Okapi(texts)
     # 3. Retrive and merge
     retrieved_texts = retriever.get_top_n(query=query, documents=texts,
-        n=len(texts))
+                                          n=len(texts))
     retrieved_texts = [retrieved_texts] if type(retrieved_texts) == str else retrieved_texts
     context = ''
     for text in retrieved_texts:
@@ -31,7 +34,8 @@ def retriveDoc(query: str, document: str, chunk_size, file_name:str,
     output_list[index] = js
     if pbar:
         pbar.update()
-    return 
+    return
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -58,13 +62,13 @@ if __name__ == '__main__':
             # for index, line in loop:
             for index, line in enumerate(file_contents):
                 if (output_data[index] != {} or
-                    "context" in output_data[index].keys() and len(output_data[index]['context']) != 0):
+                        "context" in output_data[index].keys() and len(output_data[index]['context']) != 0):
                     loop.update()
                     continue
                 line_js = json.loads(line)
                 retriveDoc(query=line_js['input'], document=line_js['context'],
-                                        chunk_size=args.chunk_size, file_name=file_name,
-                                        js=line_js, output_list=output_data, idx=index, pbar=loop)
+                           chunk_size=args.chunk_size, file_name=file_name,
+                           js=line_js, output_list=output_data, idx=index, pbar=loop)
                 # exe_list.append(executor.submit(retriveDoc, query=line_js['input'], document=line_js['context'],
                 #                         chunk_size=args.chunk_size, file_name=file_name,
                 #                         js=line_js, output_list=output_data, idx=index, pbar=loop))

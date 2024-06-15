@@ -1,11 +1,11 @@
-import os
-import json
-import pandas as pd
 import argparse
-import re
+import json
+import os
+import sys
+
+import pandas as pd
 from tqdm import tqdm
 
-import sys
 sys.path.append('..')
 from splitter import split_long_sentence, regex
 import concurrent.futures
@@ -18,7 +18,6 @@ parser.add_argument("--input_folder", type=str, default='../source/docqa_only')
 parser.add_argument("--chunk_size", type=int, default=200)
 parser.add_argument("--output_folder", type=str, default='../datasets/C200_t/split')
 args = parser.parse_args()
-
 
 
 def process_jsonl_file(input_file, output_folder, chunk_size=100, filename='Unknown'):
@@ -49,19 +48,21 @@ def process_jsonl_file(input_file, output_folder, chunk_size=100, filename='Unkn
             output_data = {
                 'id': data['_id'],
                 # 'lang': 'zh' if "_zh" in input_file else 'en',
-                'lang' : 'zh' if 'zh' in data.get('context', '') else 'en',
+                'lang': 'zh' if 'zh' in data.get('context', '') else 'en',
                 'question': data.get('input', ''),
                 'answers': []
             }
             with open(output_jsonl_file, 'w', encoding='utf-8') as f_out:
                 f_out.write(json.dumps(output_data, ensure_ascii=False) + '\n')
 
+
 def process_all_jsonl_files(input_folder, output_folder, chunk_size=1700):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
     loop = tqdm(os.listdir(input_folder))
-    allowed_files = ["multifieldqa_en.jsonl", "qasper.jsonl", "2wikimqa.jsonl", "dureader.jsonl", "hotpotqa.jsonl", "narrativeqa.jsonl", "musique.jsonl", "multifieldqa_zh.jsonl"]
+    allowed_files = ["multifieldqa_en.jsonl", "qasper.jsonl", "2wikimqa.jsonl", "dureader.jsonl", "hotpotqa.jsonl",
+                     "narrativeqa.jsonl", "musique.jsonl", "multifieldqa_zh.jsonl"]
     for filename in loop:
         if filename.endswith('.jsonl') and filename in allowed_files:
             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
@@ -70,5 +71,6 @@ def process_all_jsonl_files(input_folder, output_folder, chunk_size=1700):
                 # process_jsonl_file(input_file, output_folder, chunk_size, filename)
                 executor.submit(process_jsonl_file, input_file, output_folder, chunk_size, filename)
                 # print("split {} done!".format(filename))
+
 
 process_all_jsonl_files(args.input_folder, args.output_folder, chunk_size=args.chunk_size)

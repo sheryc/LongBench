@@ -1,7 +1,8 @@
 import openai
 from openai.embeddings_utils import cosine_similarity
-openai.api_key="KEY"
-openai.proxy=""
+
+openai.api_key = "KEY"
+openai.proxy = ""
 
 import os
 import json
@@ -9,11 +10,14 @@ from concurrent.futures import ThreadPoolExecutor, wait
 from tqdm import tqdm
 import argparse
 import sys
+
 sys.path.append("..")
 from splitter import split_long_sentence, get_word_len, regex
+
+
 # os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-def retriveDoc(query: str, document: str, chunk_size, file_name:str,
+def retriveDoc(query: str, document: str, chunk_size, file_name: str,
                js, output_list, idx, pbar=None, maxLen=1500):
     # 1. Splits the context into pieces
     texts = split_long_sentence(document, regex, chunk_size=chunk_size, filename=file_name)
@@ -31,7 +35,7 @@ def retriveDoc(query: str, document: str, chunk_size, file_name:str,
     similarity = []
     for emb in texts_embeddings['data']:
         similarity.append(cosine_similarity(emb['embedding'], query_embeddings['data'][0]['embedding']))
-    sorted_pairs=sorted(zip(similarity, texts), reverse=True)
+    sorted_pairs = sorted(zip(similarity, texts), reverse=True)
     retrieved_texts = [pair[1] for pair in sorted_pairs]
     retrieved_texts = [retrieved_texts] if type(retrieved_texts) == str else retrieved_texts
     context = ''
@@ -44,7 +48,8 @@ def retriveDoc(query: str, document: str, chunk_size, file_name:str,
     output_list[index] = js
     if pbar:
         pbar.update()
-    return 
+    return
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -68,32 +73,35 @@ if __name__ == '__main__':
                 lines = f.readlines()
                 lines = [line for line in lines]
                 output_data = [json.loads(line) for line in lines]
+
+
         def saving():
             os.makedirs(args.dest_dir, exist_ok=True)
             with open(os.path.join(args.dest_dir, file_name), 'w', encoding='utf-8') as output_file:
                 for item in output_data:
                     output_file.write(json.dumps(item, ensure_ascii=False) + '\n')
+
+
         loop = tqdm(enumerate(file_contents), total=len(file_contents), desc=f'{file_name}')
         exe_list = []
         with ThreadPoolExecutor(max_workers=3) as executor:
             # for index, line in loop:
             for index, line in enumerate(file_contents):
                 if (output_data[index] != {} or
-                    "context" in output_data[index].keys() and len(output_data[index]['context']) != 0):
+                        "context" in output_data[index].keys() and len(output_data[index]['context']) != 0):
                     loop.update()
                     continue
                 line_js = json.loads(line)
-                
+
                 try:
                     # retriveDoc(query=line_js['input'], document=line_js['context'],
                     #                     chunk_size=args.chunk_size, file_name=file_name,
                     #                     js=line_js, output_list=output_data, idx=index, pbar=loop)
                     exe_list.append(executor.submit(retriveDoc, query=line_js['input'], document=line_js['context'],
-                                            chunk_size=args.chunk_size, file_name=file_name,
-                                            js=line_js, output_list=output_data, idx=index, pbar=loop))
+                                                    chunk_size=args.chunk_size, file_name=file_name,
+                                                    js=line_js, output_list=output_data, idx=index, pbar=loop))
                 except Exception as e:
                     saving()
                     print(e)
                 wait(exe_list)
         saving()
-    
